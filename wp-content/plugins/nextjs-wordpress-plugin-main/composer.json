@@ -1,0 +1,38 @@
+{
+	"name": "gregrickaby/nextjs-wordpress-plugin",
+	"description": "A plugin to help turn WordPress into a headless CMS.",
+	"homepage": "https://github.com/gregrickaby/nextjs-wordpress-plugin",
+	"type": "wordpress-plugin",
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "Greg Rickaby",
+			"email": "greg@gregrickaby.com"
+		}
+	],
+	"autoload": {
+		"psr-4": {
+			"NextJS_WordPress_Plugin\\": "src/classes"
+		}
+	},
+	"config": {
+		"optimize-autoloader": true,
+		"process-timeout": 600,
+		"platform": {
+			"php": "8.2"
+		},
+		"allow-plugins": {
+			"composer/installers": true,
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	},
+	"require-dev": {
+		"dealerdirect/phpcodesniffer-composer-installer": "^0.7",
+		"phpcompatibility/phpcompatibility-wp": "^2.1",
+		"wp-coding-standards/wpcs": "^3.0"
+	},
+	"scripts": {
+		"format": "./vendor/bin/phpcbf --standard=.phpcs.xml",
+		"lint": "./vendor/bin/phpcs --standard=.phpcs.xml"
+	}
+}
