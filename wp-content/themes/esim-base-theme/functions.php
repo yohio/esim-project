@@ -312,221 +312,353 @@ function add_cors_headers() {
     }
 }
 
-add_action('graphql_register_types', function () {
-    register_graphql_object_type('Account', [
-        'description' => __('Custom Accounts from jet_cct_accounts table', 'global1sim'),
-        'fields'      => [
-            '_ID'            => ['type' => 'ID'],
-            'account_name'   => ['type' => 'String'],
-            'account_owner'  => ['type' => 'String'],
-            'account_balance'=> ['type' => 'String']
-        ],
-    ]);
+// ******** Account ******** //
+add_action( 'graphql_register_types', 'wpgraphql_account_register_types' );
 
-    register_graphql_field('RootQuery', 'accounts', [
-        'type'        => ['list_of' => 'Account'],
-        'description' => __('Get list of accounts', 'global1sim'),
-        'resolve'     => function () {
-            global $wpdb;
-            $table_name = $wpdb->prefix . 'jet_cct_accounts';
-            $results    = $wpdb->get_results("SELECT * FROM {$table_name}", ARRAY_A);
+function wpgraphql_account_register_types() {
+	register_graphql_object_type( 'Account', [
+		'description' => __( 'Custom Accounts from wp_jet_cct_accounts table', 'global1sim' ),
+		'interfaces' => [ 'Node' ],
+		'fields' => [
+			'_ID' => [
+				'type' => 'ID',
+				'description' => __( 'The ID of the Account', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->_ID) ? (string) $source->_ID : null;
+				}
+			],'account_name' => [
+				'type' => 'String',
+				'description' => __('The Name of the Account', 'global1sim'),
+				'resolve' => function($source) {
+					return !empty($source->account_name) ? (string) $source->account_name : null;
+				}
+			],
+			'account_owner' => [
+				'type' => 'String',
+				'description' => __( 'The Owner of the Account', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->account_name) ? (string) $source->account_name : null;
+				}
+			],
+			'account_balance' => [
+				'type' => 'String',
+				'description' => __( 'The Balance value of the Account', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->account_balance) ? (string) $source->account_balance : null;
+				}
+			]
+		]
+	] );
 
-            return array_map(function ($account) {
-                return [
-                    '_ID'            => $account['_ID'],
-                    'account_name'   => $account['account_name'],
-                    'account_owner'  => $account['account_owner'],
-                    'account_balance'=> $account['account_balance']
-                ];
-            }, $results);
-        }
-    ]);
-});
+	register_graphql_connection([
+		'fromType' => 'RootQuery',
+		'toType' => 'Account',
+		'fromFieldName' => 'account',
+		'resolve' => function( $root, $args, $context, $info ) {
+			$resolver = new AccountConnectionResolver( $root, $args, $context, $info );
+			return $resolver->get_connection();
+		}
+	]);
 
-// Hook into WPGraphQL as it builds the Schema
+}
+
+// ******** ESIM ******** //
 add_action( 'graphql_register_types', 'wpgraphql_esim_register_types' );
 
 function wpgraphql_esim_register_types() {
+	register_graphql_object_type( 'eSim', [
+		'description' => __( 'eSim for an account', 'global1sim' ),
+		'interfaces' => [ 'Node' ],
+		'fields' => [
+			'_ID' => [
+				'type' => 'ID',
+				'description' => __( 'The ID of the eSim', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->_ID) ? (string) $source->_ID : null;
+				}
+			],'iccid' => [
+				'type' => 'String',
+				'description' => __( 'The ICCID of the eSim', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->iccid) ? (string) $source->iccid : null;
+				}
+			],
+			'msisdn' => [
+				'type' => 'String',
+				'description' => __( 'The MSISDN of the eSim', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->msisdn) ? (string) $source->msisdn : null;
+				}
+			],
+			'assigned_account' => [
+				'type' => 'String',
+				'description' => __( 'The Assigned Account id of the eSim', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->assigned_account) ? (string) $source->assigned_account : null;
+				}
+			],
+			'balance' => [
+				'type' => 'String',
+				'description' => __( 'The balance value of the eSim', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->balance) ? (string) $source->balance : null;
+				}
+			],
+			'status' => [
+				'type' => 'String',
+				'description' => __( 'The status of the eSim', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->status) ? (string) $source->status : null;
+				}
+			]
+		]
+	] );
 
-register_graphql_connection([
-	// The GraphQL Type that will have a field added to it to query a connection from
-	'fromType' => 'RootQuery',
-	// The GraphQL Type the connection will return Nodes of. This type MUST implement the "Node" interface
-	'toType' => 'eSim',
-	// The field name to represent the connection on the "from" Type
-	'fromFieldName' => 'eSim',
-	// How to resolve the connection. For now we will return null, but will visit this below.
-	'resolve' => function( $root, $args, $context, $info ) {
-		// we will revisit this shortly
-		return null;
-	} 
-	]);
-
-  // Register the GraphQL Object Type to the Schema
-  register_graphql_object_type( 'eSim', [
-    // Be sure to replace your-text-domain for i18n of your plugin
-    'description' => __( 'eSim', 'global1sim' ),
-    // By implementing the "Node" interface the eSims Object Type will automaticaly have an "id" field.
-    // By implementing the "DatabaseIdentifier" interface, the eSims Object Type will automatically have a "databaseId" field
-    'interfaces' => [ 'Node', 'DatabaseIdentifier' ],
-    // The fields that can be queried for on the eSims type
-    'fields' => [
-       'id' => [
-         'resolve' => function( $root, $args, $context, $info ) {
-			// we will revisit this shortly
-			$resolver = new eSimsConnectionResolver( $root, $args, $context, $info );
+	register_graphql_connection([
+		'fromType' => 'RootQuery',
+		'toType' => 'eSim',
+		'fromFieldName' => 'eSim',
+		'resolve' => function( $root, $args, $context, $info ) {
+			$resolver = new ESIMConnectionResolver( $root, $args, $context, $info );
 			return $resolver->get_connection();
 		}
-       ],
-       'iccid' => [
-         'type' => 'String',
-         'description' => __( 'The ICCID of the eSim', 'global1sim' ),
-       ],
-       'msisdn' => [
-         'type' => 'String',
-         'description' => __( 'The MSISDN of the eSim', 'global1sim' ),
-       ],
-       'assigned_account' => [
-         'type' => 'String',
-         'description' => __( 'The Assigned Account id of the eSim', 'global1sim' ),
-       ],
-	   'balance' => [
-         'type' => 'String',
-         'description' => __( 'The balance value of the eSim', 'global1sim' ),
-       ],
-	   'status' => [
-         'type' => 'String',
-         'description' => __( 'The status of the eSim', 'global1sim' ),
-       ]
-    ]
-  ] );
+	]);
+
+	register_graphql_connection([
+		'fromType' => 'eSim',
+		'toType' => 'Account',
+		'fromFieldName' => 'account',
+		'oneToOne' => true,
+		'resolve' => function( $root, $args, $context, $info ) {
+			$resolver = new AccountConnectionResolver( $root, $args, $context, $info );
+			$resolver->set_query_arg( 'include', $root->id );
+			return $resolver->one_to_one()->get_connection();
+		}
+	]);
+
+	register_graphql_connection([
+		'fromType' => 'Account',
+		'toType' => 'eSim',
+		'fromFieldName' => 'eSim',
+		'oneToOne' => false, // Remove this or set to false for list fields
+		'resolve' => function( $root, $args, $context, $info ) {
+        $resolver = new ESIMConnectionResolver( $root, $args, $context, $info );
+        
+			// Make sure we have a valid account owner ID
+			$account_id = !empty($root->_ID) ? $root->_ID : null;
+			
+			if ($account_id) {
+				$resolver->set_query_arg( 'assigned_account', $account_id );
+			}
+			
+			return $resolver->get_connection();
+		}
+	]);
 
 }
 
 add_action( 'graphql_init', function() {
 
 	/**
-	 * Class ESimsLoader
+	 * Class AccountLoader
 	 */
-	class ESimsLoader extends \WPGraphQL\Data\Loader\AbstractDataLoader {
+	class AccountLoader extends \WPGraphQL\Data\Loader\AbstractDataLoader {
+
+		/**
+		 * Given an array of one or more keys (ids) load the corresponding Accounts
+		 *
+		 * @param array $keys Array of keys to identify nodes by
+		 *
+		 * @return array|null
+		 */
+		public function loadKeys( array $keys ): ?array {
+			if ( empty( $keys ) ) {
+				return null;
+			}
+
+			global $wpdb;
+
+			
+			$table_name = $wpdb->prefix . 'jet_cct_accounts';
+			$placeholders = implode(',', array_fill(0, count($keys), '%d'));
+			$query = $wpdb->prepare("SELECT * FROM {$table_name} WHERE _ID IN ($placeholders)", $keys);
+			$results    = $wpdb->get_results($query);
+			
+			if ( empty( $results ) ) {
+				return null;
+			}
+
+			$AccountsById = [];
+			foreach ( $results as $result ) {
+				$result->__typename = 'Account';
+
+				$AccountsById[ $result->_ID ] = $result;
+			}
+
+			
+
+			$orderedAccounts = [];
+			foreach ( $keys as $key ) {
+				if ( array_key_exists( $key, $AccountsById ) ) {
+					$orderedAccounts[ $key ] = $AccountsById[ $key ];
+				}
+			}
+
+			return $orderedAccounts;
+
+		}
+	}
+
+	add_filter( 'graphql_data_loaders', function( $loaders, $context ) {
+		$loaders['Account'] = new AccountLoader( $context );
+		return $loaders;
+	}, 10, 2 );
+
+	add_filter( 'graphql_resolve_node_type', function( $type, $node ) {
+		return $node->__typename ?? $type;
+	}, 10, 2 );
+
+	class AccountConnectionResolver extends \WPGraphQL\Data\Connection\AbstractConnectionResolver {
+
+		public function get_loader_name(): string {
+			return 'Account';
+		}
+
+		public function get_query_args(): array {
+			return $this->args;
+		}
+
+		public function get_query(): array|bool|null {
+			global $wpdb;
+			$table_name = $wpdb->prefix . 'jet_cct_accounts';
+			$query = "SELECT _ID FROM {$table_name}";
+			$ids_array = $wpdb->get_results($query);
+			return !empty($ids_array) ? array_values(array_column($ids_array, '_ID')) : [];
+		}
+
+		// This determines how to get IDs. In our case, the query itself returns IDs
+		// But sometimes queries, such as WP_Query might return an object with IDs as a property (i.e. $wp_query->posts )
+		public function get_ids(): array|bool|null {
+			return $this->get_query();
+		}
+
+		public function is_valid_offset( $offset ): bool {
+			return true;
+		}
+
+		// This gives a chance to validate that the Model being resolved is valid.
+		// We're skipping this and always saying the data is valid, but this is a good
+		// place to add some validation before returning data
+		public function is_valid_model( $model ): bool {
+			return true;
+		}
+
+		// You can implement logic here to determine whether or not to execute.
+		// for example, if the data is private you could set to false if the user is not logged in, etc
+		public function should_execute(): bool {
+			return true;
+		}
+
+	}
+
+	/**
+	 * Class ESIMLoader
+	 */
+	class ESIMLoader extends \WPGraphQL\Data\Loader\AbstractDataLoader {
 
 		/**
 		 * Given an array of one or more keys (ids) load the corresponding eSims
 		 *
 		 * @param array $keys Array of keys to identify nodes by
 		 *
-		 * @return array
+		 * @return array|null
 		 */
-		public function loadKeys( array $keys ): array {
+		public function loadKeys( array $keys ): ?array {
 			if ( empty( $keys ) ) {
-				return [];
+				return []; // Return empty array instead of null
 			}
 
 			global $wpdb;
 
-			// Prepare a SQL query to select rows that match the given IDs
 			$table_name = $wpdb->prefix . 'jet_cct_esim';
-			$ids        = implode( ', ', $keys );
-			$query      = $wpdb->prepare( "SELECT * FROM $table_name WHERE id IN ($ids) ORDER BY id ASC", $ids );
+			$placeholders = implode(',', array_fill(0, count($keys), '%d'));
+			$query = $wpdb->prepare("SELECT * FROM {$table_name} WHERE _ID IN ($placeholders)", $keys);
 			$results    = $wpdb->get_results($query);
 
 			if ( empty( $results ) ) {
-				return [];
+				return []; // Return empty array instead of null
 			}
 
-			// Convert the array of eSim to an associative array keyed by their IDs
 			$eSimsById = [];
 			foreach ( $results as $result ) {
-				// ensure the eSim is returned with the eSims __typename
 				$result->__typename = 'eSim';
-				$eSimsById[ $result->id ] = $result;
+
+				$eSimsById[ $result->_ID ] = $result;
 			}
 
-			// Create an ordered array based on the ordered IDs
-			$orderedESims = [];
+			$orderedESIMS = [];
 			foreach ( $keys as $key ) {
 				if ( array_key_exists( $key, $eSimsById ) ) {
-					$orderedESims[ $key ] = $eSimsById[ $key ];
+					$orderedESIMS[ $key ] = $eSimsById[ $key ];
 				}
 			}
 
-			return $orderedESims;
+			return $orderedESIMS;
 
 		}
 	}
 
-  // Add the eSims loader to be used under the hood by WPGraphQL when loading nodes
 	add_filter( 'graphql_data_loaders', function( $loaders, $context ) {
-		$loaders['eSim'] = new ESimsLoader( $context );
+		$loaders['eSim'] = new ESIMLoader( $context );
 		return $loaders;
 	}, 10, 2 );
 
-  // Filter so nodes that have a __typename will return that typename
 	add_filter( 'graphql_resolve_node_type', function( $type, $node ) {
 		return $node->__typename ?? $type;
 	}, 10, 2 );
 
-});
+	class ESIMConnectionResolver extends \WPGraphQL\Data\Connection\AbstractConnectionResolver {
 
-add_action( 'graphql_init', function() {
-
-	class eSimsConnectionResolver extends \WPGraphQL\Data\Connection\AbstractConnectionResolver {
-
-    // Tell WPGraphQL which Loader to use. We define the `eSim` loader that we registered already.
 		public function get_loader_name(): string {
 			return 'eSim';
 		}
 
-    // Get the arguments to pass to the query.
-    // We're defaulting to an empty array as we're not supporting pagination/filtering/sorting in this example
 		public function get_query_args(): array {
-			return [];
+			return $this->args;
 		}
 
-    // Determine the query to run. Since we're interacting with a custom database Table, we
-    // use $wpdb to execute a query against the table.
-    // This is where logic needs to be mapped to account for any arguments the user inputs, such as pagination, filtering, sorting, etc.
-    // For this example, we are only executing the most basic query without support for pagination, etc.
-    // You could use an ORM to access data or whatever else you like here.
 		public function get_query(): array|bool|null {
 			global $wpdb;
+
+			
 			$current_user_id = get_current_user_id();
+			$account_id = $this->query_args['assigned_account'] ?? $current_user_id;
+			$table_name = $wpdb->prefix . 'jet_cct_esim';
+			$query = $wpdb->prepare("SELECT _ID FROM {$table_name} WHERE assigned_account=$account_id");
+			$ids_array = $wpdb->get_results($query);
 
-			$user_id = $this->query_args['user_id'] ?? $current_user_id;
-
-			$ids_array = $wpdb->get_results(
-				$wpdb->prepare(
-					sprintf(
-						'SELECT id FROM %1$sjet_cct_esim WHERE user_id=%2$d LIMIT 10',
-						$wpdb->prefix,
-						$user_id
-					)
-				)
-			);
-
-			return ! empty( $ids_array ) ? array_values( array_column( $ids_array, 'id' ) ) : [];
+			return ! empty( $ids_array ) ? array_values( array_column( $ids_array, '_ID' ) ) : [];
 		}
 
-    // This determines how to get IDs. In our case, the query itself returns IDs
-    // But sometimes queries, such as WP_Query might return an object with IDs as a property (i.e. $wp_query->posts )
+		// This determines how to get IDs. In our case, the query itself returns IDs
+		// But sometimes queries, such as WP_Query might return an object with IDs as a property (i.e. $wp_query->posts )
 		public function get_ids(): array|bool|null {
 			return $this->get_query();
 		}
 
-    // This allows for validation on the offset. If your data set needs specific data to determine the offset, you can validate that here.
 		public function is_valid_offset( $offset ): bool {
 			return true;
 		}
 
-    // This gives a chance to validate that the Model being resolved is valid.
-    // We're skipping this and always saying the data is valid, but this is a good
-    // place to add some validation before returning data
+		// This gives a chance to validate that the Model being resolved is valid.
+		// We're skipping this and always saying the data is valid, but this is a good
+		// place to add some validation before returning data
 		public function is_valid_model( $model ): bool {
 			return true;
 		}
 
-    // You can implement logic here to determine whether or not to execute.
-    // for example, if the data is private you could set to false if the user is not logged in, etc
+		// You can implement logic here to determine whether or not to execute.
+		// for example, if the data is private you could set to false if the user is not logged in, etc
 		public function should_execute(): bool {
 			return true;
 		}
