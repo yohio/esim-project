@@ -360,6 +360,29 @@ function wpgraphql_account_register_types() {
 		}
 	]);
 
+	register_graphql_connection([
+		'fromType' => 'eSim',
+		'toType' => 'Account',
+		'fromFieldName' => 'account',
+		'oneToOne' => true,
+		'resolve' => function( $root, $args, $context, $info ) {
+			$resolver = new AccountConnectionResolver( $root, $args, $context, $info );
+			$resolver->set_query_arg( 'include', $root->id );
+			return $resolver->one_to_one()->get_connection();
+		}
+	]);
+
+	register_graphql_connection([
+		'fromType' => 'Source',
+		'toType' => 'Account',
+		'fromFieldName' => 'account',
+		'resolve' => function( $root, $args, $context, $info ) {
+			$resolver = new AccountConnectionResolver( $root, $args, $context, $info );
+			$resolver->set_query_arg( 'include', $root->id );
+			return $resolver->get_connection();
+		}
+	]);
+
 }
 
 // ******** ESIM ******** //
@@ -425,18 +448,6 @@ function wpgraphql_esim_register_types() {
 	]);
 
 	register_graphql_connection([
-		'fromType' => 'eSim',
-		'toType' => 'Account',
-		'fromFieldName' => 'account',
-		'oneToOne' => true,
-		'resolve' => function( $root, $args, $context, $info ) {
-			$resolver = new AccountConnectionResolver( $root, $args, $context, $info );
-			$resolver->set_query_arg( 'include', $root->id );
-			return $resolver->one_to_one()->get_connection();
-		}
-	]);
-
-	register_graphql_connection([
 		'fromType' => 'Account',
 		'toType' => 'eSim',
 		'fromFieldName' => 'eSim',
@@ -455,7 +466,166 @@ function wpgraphql_esim_register_types() {
 		}
 	]);
 
+	register_graphql_connection([
+		'fromType' => 'Customer',
+		'toType' => 'eSim',
+		'fromFieldName' => 'eSim',
+		'oneToOne' => false, // Remove this or set to false for list fields
+		'resolve' => function( $root, $args, $context, $info ) {
+        $resolver = new ESIMConnectionResolver( $root, $args, $context, $info );
+        
+			// Make sure we have a valid account owner ID
+			$account_id = !empty($root->_ID) ? $root->_ID : null;
+			
+			if ($account_id) {
+				$resolver->set_query_arg( 'assigned_account', $account_id );
+			}
+			
+			return $resolver->get_connection();
+		}
+	]);
+
 }
+
+// ******** Customer ******** //
+add_action( 'graphql_register_types', 'wpgraphql_customer_register_types' );
+
+function wpgraphql_customer_register_types() {
+	register_graphql_object_type( 'Customer', [
+		'description' => __( 'Customer for an account', 'global1sim' ),
+		'interfaces' => [ 'Node' ],
+		'fields' => [
+			'_ID' => [
+				'type' => 'ID',
+				'description' => __( 'The ID of the Customer', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->_ID) ? (string) $source->_ID : null;
+				}
+			],'first_name' => [
+				'type' => 'String',
+				'description' => __( 'The First Name of the Customer', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->first_name) ? (string) $source->first_name : null;
+				}
+			],
+			'last_name' => [
+				'type' => 'String',
+				'description' => __( 'The Last Name of the Customer', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->last_name) ? (string) $source->last_name : null;
+				}
+			],
+			'phone' => [
+				'type' => 'String',
+				'description' => __( 'The Phone id of the Customer', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->phone) ? (string) $source->phone : null;
+				}
+			],
+			'email' => [
+				'type' => 'String',
+				'description' => __( 'The Email of the Customer', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->email) ? (string) $source->email : null;
+				}
+			],
+			'assigned_esim' => [
+				'type' => 'String',
+				'description' => __( 'The assigned_esim of the Customer', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->assigned_esim) ? (string) $source->assigned_esim : null;
+				}
+			]
+		]
+	] );
+
+	register_graphql_connection([
+		'fromType' => 'RootQuery',
+		'toType' => 'Customer',
+		'fromFieldName' => 'Customer',
+		'resolve' => function( $root, $args, $context, $info ) {
+			$resolver = new CustomerConnectionResolver( $root, $args, $context, $info );
+			return $resolver->get_connection();
+		}
+	]);
+
+	register_graphql_connection([
+		'fromType' => 'Customer',
+		'toType' => 'eSim',
+		'fromFieldName' => 'eSim',
+		'resolve' => function( $root, $args, $context, $info ) {
+			$resolver = new CustomerConnectionResolver( $root, $args, $context, $info );
+			// Make sure we have a valid account owner ID
+			$assigned_esim = !empty($root->assigned_esim) ? $root->assigned_esim : 0;
+
+			if ($assigned_esim) {
+				$resolver->set_query_arg( 'include', $root->assigned_esim );
+			}
+			return $resolver->one_to_one()->get_connection();
+		}
+	]);
+
+}
+
+// ******** Source ******** //
+add_action( 'graphql_register_types', 'wpgraphql_source_register_types' );
+
+function wpgraphql_source_register_types() {
+	register_graphql_object_type( 'Source', [
+		'description' => __( 'Source for an account', 'global1sim' ),
+		'interfaces' => [ 'Node' ],
+		'fields' => [
+			'_ID' => [
+				'type' => 'ID',
+				'description' => __( 'The ID of the Source', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->_ID) ? (string) $source->_ID : null;
+				}
+			],'source_name' => [
+				'type' => 'String',
+				'description' => __( 'The Source Name of the Source', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->source_name) ? (string) $source->source_name : null;
+				}
+			],
+			'assigned_account' => [
+				'type' => 'String',
+				'description' => __( 'The Assigned Account of the Source', 'global1sim' ),
+				'resolve' => function($source) {
+					return !empty($source->assigned_account) ? (string) $source->assigned_account : null;
+				}
+			]
+		]
+	] );
+
+	register_graphql_connection([
+		'fromType' => 'RootQuery',
+		'toType' => 'Source',
+		'fromFieldName' => 'Source',
+		'resolve' => function( $root, $args, $context, $info ) {
+			$resolver = new SourceConnectionResolver( $root, $args, $context, $info );
+			return $resolver->get_connection();
+		}
+	]);
+
+	register_graphql_connection([
+		'fromType' => 'Account',
+		'toType' => 'Source',
+		'fromFieldName' => 'source',
+		'resolve' => function( $root, $args, $context, $info ) {
+			$resolver = new SourceConnectionResolver( $root, $args, $context, $info );
+			// Make sure we have a valid account owner ID
+			$assigned_account = !empty($root->_ID) ? $root->_ID : 0;
+
+			if ($assigned_account) {
+				$resolver->set_query_arg( 'assigned_account', $assigned_account );
+			}
+			return $resolver->get_connection();
+		}
+	]);
+
+}
+
 
 add_action( 'graphql_init', function() {
 
@@ -582,6 +752,7 @@ add_action( 'graphql_init', function() {
 
 			$table_name = $wpdb->prefix . 'jet_cct_esim';
 			$placeholders = implode(',', array_fill(0, count($keys), '%d'));
+			
 			$query = $wpdb->prepare("SELECT * FROM {$table_name} WHERE _ID IN ($placeholders)", $keys);
 			$results    = $wpdb->get_results($query);
 
@@ -635,6 +806,10 @@ add_action( 'graphql_init', function() {
 			$account_id = $this->query_args['assigned_account'] ?? $current_user_id;
 			$table_name = $wpdb->prefix . 'jet_cct_esim';
 			$query = $wpdb->prepare("SELECT _ID FROM {$table_name} WHERE assigned_account=$account_id");
+			if (empty($account_id) || ( $account_id == $current_user_id && current_user_can('manage_options'))) {
+				$query = $wpdb->prepare("SELECT _ID FROM {$table_name}");
+			}
+			
 			$ids_array = $wpdb->get_results($query);
 
 			return ! empty( $ids_array ) ? array_values( array_column( $ids_array, '_ID' ) ) : [];
@@ -665,4 +840,218 @@ add_action( 'graphql_init', function() {
 
 	}
 
+	/**
+	 * Class CustomerLoader
+	 */
+	class CustomerLoader extends \WPGraphQL\Data\Loader\AbstractDataLoader {
+
+		/**
+		 * Given an array of one or more keys (ids) load the corresponding Customers
+		 *
+		 * @param array $keys Array of keys to identify nodes by
+		 *
+		 * @return array|null
+		 */
+		public function loadKeys( array $keys ): ?array {
+			if ( empty( $keys ) ) {
+				return []; // Return empty array instead of null
+			}
+
+			global $wpdb;
+
+			$table_name = $wpdb->prefix . 'jet_cct_customer';
+			$placeholders = implode(',', array_fill(0, count($keys), '%d'));
+			$query = $wpdb->prepare("SELECT * FROM {$table_name} WHERE _ID IN ($placeholders)", $keys);
+			$results    = $wpdb->get_results($query);
+
+			if ( empty( $results ) ) {
+				return []; // Return empty array instead of null
+			}
+
+			$CustomersById = [];
+			foreach ( $results as $result ) {
+				$result->__typename = 'Customer';
+
+				$CustomersById[ $result->_ID ] = $result;
+			}
+
+			$orderedCustomers = [];
+			foreach ( $keys as $key ) {
+				if ( array_key_exists( $key, $CustomersById ) ) {
+					$orderedCustomers[ $key ] = $CustomersById[ $key ];
+				}
+			}
+
+			return $orderedCustomers;
+
+		}
+	}
+
+	add_filter( 'graphql_data_loaders', function( $loaders, $context ) {
+		
+		$loaders['Customer'] = new CustomerLoader( $context );
+		return $loaders;
+	}, 10, 2 );
+
+	add_filter( 'graphql_resolve_node_type', function( $type, $node ) {
+		return $node->__typename ?? $type;
+	}, 10, 2 );
+
+	class CustomerConnectionResolver extends \WPGraphQL\Data\Connection\AbstractConnectionResolver {
+
+		public function get_loader_name(): string {
+			return 'Customer';
+		}
+
+		public function get_query_args(): array {
+			return $this->args;
+		}
+
+		public function get_query(): array|bool|null {
+			global $wpdb;
+
+			
+			$assigned_esim = $this->query_args["assigned_esim"] || NULL ;
+			$table_name = $wpdb->prefix . 'jet_cct_esim';
+			if (empty($assigned_esim) || current_user_can('manage_options')) {
+				$query = $wpdb->prepare("SELECT * FROM {$table_name}");
+			} else {
+				$query = $wpdb->prepare("SELECT * FROM {$table_name} WHERE _ID=$assigned_esim");
+			}
+			$ids_array = $wpdb->get_results($query);
+
+			return ! empty( $ids_array ) ? array_values( array_column( $ids_array, '_ID' ) ) : [];
+		}
+
+		// This determines how to get IDs. In our case, the query itself returns IDs
+		// But sometimes queries, such as WP_Query might return an object with IDs as a property (i.e. $wp_query->posts )
+		public function get_ids(): array|bool|null {
+			return $this->get_query();
+		}
+
+		public function is_valid_offset( $offset ): bool {
+			return true;
+		}
+
+		// This gives a chance to validate that the Model being resolved is valid.
+		// We're skipping this and always saying the data is valid, but this is a good
+		// place to add some validation before returning data
+		public function is_valid_model( $model ): bool {
+			return true;
+		}
+
+		// You can implement logic here to determine whether or not to execute.
+		// for example, if the data is private you could set to false if the user is not logged in, etc
+		public function should_execute(): bool {
+			return true;
+		}
+
+	}
+
+	/**
+	 * Class SourceLoader
+	 */
+	class SourceLoader extends \WPGraphQL\Data\Loader\AbstractDataLoader {
+
+		/**
+		 * Given an array of one or more keys (ids) load the corresponding Sources
+		 *
+		 * @param array $keys Array of keys to identify nodes by
+		 *
+		 * @return array|null
+		 */
+		public function loadKeys( array $keys ): ?array {
+			if ( empty( $keys ) ) {
+				return []; // Return empty array instead of null
+			}
+
+			global $wpdb;
+
+			$table_name = $wpdb->prefix . 'jet_cct_source';
+			$placeholders = implode(',', array_fill(0, count($keys), '%d'));
+			$query = $wpdb->prepare("SELECT * FROM {$table_name} WHERE _ID IN ($placeholders)", $keys);
+			$results    = $wpdb->get_results($query);
+
+			if ( empty( $results ) ) {
+				return []; // Return empty array instead of null
+			}
+
+			$SourcesById = [];
+			foreach ( $results as $result ) {
+				$result->__typename = 'Source';
+
+				$SourcesById[ $result->_ID ] = $result;
+			}
+
+			$orderedSources = [];
+			foreach ( $keys as $key ) {
+				if ( array_key_exists( $key, $SourcesById ) ) {
+					$orderedSources[ $key ] = $SourcesById[ $key ];
+				}
+			}
+
+			return $orderedSources;
+
+		}
+	}
+
+	add_filter( 'graphql_data_loaders', function( $loaders, $context ) {
+		
+		$loaders['Source'] = new SourceLoader( $context );
+		return $loaders;
+	}, 10, 2 );
+
+	add_filter( 'graphql_resolve_node_type', function( $type, $node ) {
+		return $node->__typename ?? $type;
+	}, 10, 2 );
+
+	class SourceConnectionResolver extends \WPGraphQL\Data\Connection\AbstractConnectionResolver {
+
+		public function get_loader_name(): string {
+			return 'Source';
+		}
+
+		public function get_query_args(): array {
+			return $this->args;
+		}
+
+		public function get_query(): array|bool|null {
+			global $wpdb;
+			// graphql_debug( "########## get_query_args: " . json_encode($this->qsuery_args) );
+			$assigned_account = $this->query_args["assigned_account"] || NULL ;
+			$table_name = $wpdb->prefix . 'jet_cct_accounts';
+			if (empty($assigned_account) || current_user_can('manage_options')) {
+				$query = $wpdb->prepare("SELECT * FROM {$table_name}");
+			} else {
+				$query = $wpdb->prepare("SELECT * FROM {$table_name} WHERE _ID=$assigned_account");
+			}
+			$ids_array = $wpdb->get_results($query);
+
+			return ! empty( $ids_array ) ? array_values( array_column( $ids_array, '_ID' ) ) : [];
+		}
+
+		// This determines how to get IDs. In our case, the query itself returns IDs
+		// But sometimes queries, such as WP_Query might return an object with IDs as a property (i.e. $wp_query->posts )
+		public function get_ids(): array|bool|null {
+			return $this->get_query();
+		}
+
+		public function is_valid_offset( $offset ): bool {
+			return true;
+		}
+
+		// This gives a chance to validate that the Model being resolved is valid.
+		// We're skipping this and always saying the data is valid, but this is a good
+		// place to add some validation before returning data
+		public function is_valid_model( $model ): bool {
+			return true;
+		}
+
+		// You can implement logic here to determine whether or not to execute.
+		// for example, if the data is private you could set to false if the user is not logged in, etc
+		public function should_execute(): bool {
+			return true;
+		}
+
+	}
 });

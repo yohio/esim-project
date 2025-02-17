@@ -73,7 +73,9 @@ define('JWT_AUTH_CORS_ENABLE', true);
  * a unique prefix. Only numbers, letters, and underscores please!
  */
 $table_prefix = 'wp_';
-
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+define('GRAPHQL_DEBUG', true);
 
 /* Add any custom values between this line and the "stop editing" line. */
 
