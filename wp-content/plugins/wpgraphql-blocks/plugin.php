@@ -5,8 +5,8 @@
  * Plugin URI: https://github.com/webdeveducation/wp-graphql-blocks
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
- * Author URI: https://webdeveducation.com
- * Version: 2.0.3
+ * Author URI: https://wp-block-tools.com
+ * Version: 2.1.2
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -24,8 +24,28 @@ if (!class_exists('WPGraphQLBlocks')) {
 
   class Block
   {
-    public function __construct($data, $post_id, $post_content, $query_args, $global_styles)
+    public function __construct($data, $post_id, $post_content, $query_args, $global_theme_styles, $global_db_styles)
     {
+      $blockString = render_block($data);
+      wp_reset_postdata();
+      $originalContent = str_replace("\n", "", $data['innerHTML']);
+      $dynamicContent = str_replace("\n", "", $blockString);
+
+      // dynamicContent and originalContent are false by default.
+      // if they are true, add them
+      if($query_args['dynamicContent']){
+        $this->dynamicContent = $dynamicContent;
+      }
+
+      if($query_args['originalContent']){
+        $this->originalContent = $originalContent;
+      }
+
+      $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
+      $htmlContent = str_replace("\n", "", $htmlContent);
+      $htmlContent = str_replace("\r", "", $htmlContent);
+      $htmlContent = str_replace("\t", "", $htmlContent);
+      
       $this->name = $data['blockName'];
       $attributes = $data['attrs'];
 
@@ -33,8 +53,12 @@ if (!class_exists('WPGraphQLBlocks')) {
         $global_styles['core/button'] = $attributes['style']['elements']['button'];
       }
 
-      if($global_styles[$data['blockName']]){
-        $attributes['globalStyles'] = array_merge($attributes['globalStyles'] ?? [], $global_styles[$data['blockName']]);
+      if($global_theme_styles[$data['blockName']]){
+        $attributes['globalStyles'] = array_merge($attributes['globalStyles'] ?? [], $global_theme_styles[$data['blockName']]);
+      }
+
+      if($global_db_styles[$data['blockName']]){
+        $attributes['globalStyles'] = array_merge($attributes['globalStyles'] ?? [], $global_db_styles[$data['blockName']]);
       }
 
       if($data['blockName'] === "core/site-logo"){
@@ -80,15 +104,74 @@ if (!class_exists('WPGraphQLBlocks')) {
       }
 
       if ($data['blockName'] == 'core/image') {
-        if (!$attributes['height'] && !$attributes['width']) {
-          // get media item
-          $img = wp_get_attachment_image_src($attributes['id'], 'full');
-          if ($img) {
-            $attributes['url'] = $img[0];
-            $attributes['width'] = $img[1];
-            $attributes['height'] = $img[2];
+
+        if($attributes['width']){
+          $attributes['displayWidth'] = $attributes['width'];
+        }
+
+        if($attributes['height']){
+          $attributes['displayHeight'] = $attributes['height'];
+        }
+
+        unset($attributes['height']);
+        unset($attributes['width']);
+
+        // get media item
+        $img = wp_get_attachment_image_src($attributes['id'], 'full');
+        if ($img) {
+          $image_alt = get_post_meta($attributes['id'], '_wp_attachment_image_alt', TRUE);
+          $attributes['url'] = $img[0];
+          $attributes['width'] = $img[1];
+          $attributes['height'] = $img[2];
+          if($image_alt){
+            $attributes['alt'] = $image_alt;
           }
         }
+        $dom = new \DOMDocument();
+        $htmlString = "<html><body>" . $htmlContent . "</body></html>";
+        $htmlString = str_replace("\n", "", $htmlString);
+        $htmlString = str_replace("\r", "", $htmlString);
+        $htmlString = str_replace("\t", "", $htmlString);
+        $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $img_tags = $dom->getElementsByTagName('img');
+        if($img_tags && $img_tags[0]){
+          $alt = $img_tags[0]->getAttribute('alt');
+          if($alt){
+            $attributes['alt'] = $alt;
+          }
+
+          if(!$attributes['url']){
+            $url = $img_tags[0]->getAttribute('src');
+            $attributes['url'] = $url;
+          }
+        }
+        $fig_captions = $dom->getElementsByTagName('figcaption');
+        if($fig_captions && $fig_captions[0]){
+          $caption = $fig_captions[0]->nodeValue;
+          if($caption){
+            $attributes['caption'] = $caption;
+          }
+        }
+        $anchors = $dom->getElementsByTagName('a');
+        if($anchors && $anchors[0]){
+          $href = $anchors[0]->getAttribute('href');
+          $target = $anchors[0]->getAttribute('target');
+          $rel = $anchors[0]->getAttribute('rel');
+          $class_names = $anchors[0]->getAttribute('class');
+          if($href){
+            $attributes['href'] = $href;
+          }
+          if($target){
+            $attributes['target'] = $target;
+          }
+          if($rel){
+            $attributes['rel'] = $rel;
+          }
+          if($class_names){
+            $attributes['linkClassName'] = $class_names;
+          }
+        }
+        unset($dom);
       }
 
       if ($data['blockName'] == 'core/columns') {
@@ -253,7 +336,7 @@ if (!class_exists('WPGraphQLBlocks')) {
           $innerBlock['attrs']['post_id_to_hydrate_template'] = $attributes['post_id_to_hydrate_template'];
         }
         if (isset($innerBlock['blockName'])) {
-          $innerBlocks[] = new Block($innerBlock, $post_id, $post_content, $query_args, $global_styles);
+          $innerBlocks[] = new Block($innerBlock, $post_id, $post_content, $query_args, $global_theme_styles, $global_db_styles);
         }
       }
 
@@ -264,25 +347,7 @@ if (!class_exists('WPGraphQLBlocks')) {
         setup_postdata($post);
       }
 
-      $blockString = render_block($data);
-      wp_reset_postdata();
-      $originalContent = str_replace("\n", "", $data['innerHTML']);
-      $dynamicContent = str_replace("\n", "", $blockString);
-
-      // dynamicContent and originalContent are false by default.
-      // if they are true, add them
-      if($query_args['dynamicContent']){
-        $this->dynamicContent = $dynamicContent;
-      }
-
-      if($query_args['originalContent']){
-        $this->originalContent = $originalContent;
-      }
-
-      $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
-      $htmlContent = str_replace("\n", "", $htmlContent);
-      $htmlContent = str_replace("\r", "", $htmlContent);
-      $htmlContent = str_replace("\t", "", $htmlContent);
+      
 
       if($data['blockName'] === "core/list-item"){
         $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -5);
@@ -296,7 +361,6 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
       if ($data['blockName'] == 'core/button') {
-        //wp_send_json($htmlContent);
         $dom = new \DOMDocument();
         $htmlString = "<html><body>" . $htmlContent . "</body></html>";
         $htmlString = str_replace("\n", "", $htmlString);
@@ -316,7 +380,6 @@ if (!class_exists('WPGraphQLBlocks')) {
           }
         }
         unset($dom);
-
       }
       if ($data['blockName'] == 'core/heading') {
         // level assumes that if there's no value set for this attributes, then it's default value is 2
@@ -419,11 +482,9 @@ if (!class_exists('WPGraphQLBlocks')) {
           'args' => [
             'postId' => [
               'type' => ['non_null' => 'Int'],
-              'description' => 'Argument 1 description',
             ],
             'queryId' => [
               'type' => ['non_null' => 'Int'],
-              'description' => 'Argument 2 description',
             ],
             'page' => [
               'type' => ['non_null' => 'Int'],
@@ -521,7 +582,7 @@ if (!class_exists('WPGraphQLBlocks')) {
                 ]);
                 foreach ($result as $block) {
                   if (isset($block['blockName'])) {
-                    $mappedBlocksResult[] = new Block($block, $postId, null, $query_args, []);
+                    $mappedBlocksResult[] = new Block($block, $postId, null, $query_args, [], []);
                   }
                 }
               }
@@ -562,8 +623,6 @@ if (!class_exists('WPGraphQLBlocks')) {
           ],
           'description' => __('Returns all blocks as a JSON object', 'wp-graphql-blocks'),
           'resolve' => function ($post, $args, $context, $info) {
-            // get global styles
-            // `wp-global-styles-${themeName}`
             $mappedBlocks = get_mapped_blocks($post, $args);
             $mappedBlocks = clean_attributes($mappedBlocks);
             return wp_json_encode($mappedBlocks);

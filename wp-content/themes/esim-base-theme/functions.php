@@ -312,6 +312,180 @@ function add_cors_headers() {
     }
 }
 
+
+// Add custom fields to user profile
+add_action( 'graphql_register_types', function() {
+    register_graphql_field( 'Users', 'contact_name', [
+        'type' => 'text',
+        'resolve' => function( $user ) {
+            $contact_name = get_user_meta( $user->databaseId, 'contact_name'  );
+            return ! empty( $contact_name ) ? $contact_name : null;
+        }
+    ]);
+});
+
+add_action( 'show_user_profile', 'ararat_profile_fields' );
+add_action( 'edit_user_profile', 'ararat_profile_fields' );
+
+function ararat_profile_fields( $user ) {
+
+	// let's get custom field values
+	$contact_name = get_user_meta( $user->ID, 'contact_name', true );
+	$contact_email = get_user_meta( $user->ID, 'contact_email', true );
+	$contact_phone = get_user_meta( $user->ID, 'contact_phone', true );
+	$contact_country = get_user_meta( $user->ID, 'contact_country', true );
+
+	?>
+		<h3>Contact Information</h3>
+		<table class="form-table">
+	 		<tr>
+				<th><label for="contact_name">Contact Name</label></th>
+		 		<td>
+					<input type="text" name="contact_name" id="contact_name" value="<?php echo esc_attr( $contact_name ) ?>" class="regular-text" />
+				</td>
+			</tr>
+			<tr>
+				<th><label for="contact_email">Contact Email</label></th>
+				<td>
+					<input type="text" name="contact_email" id="contact_email" value="<?php echo esc_attr( $contact_email ) ?>" class="regular-text" />
+				</td>
+			</tr>
+			<tr>
+				<th><label for="contact_phone">Contact Phone</label></th>
+				<td>
+					<input type="text" name="contact_phone" id="contact_phone" value="<?php echo esc_attr( $contact_phone ) ?>" class="regular-text" />
+				</td>
+			</tr>
+			<tr>
+				<th><label for="contact_country">Contact Country</label></th>
+				<td>
+					<input type="text" name="contact_country" id="contact_country" value="<?php echo esc_attr( $contact_country ) ?>" class="regular-text" />
+				</td>
+			</tr>
+		</table>
+	<?php
+}
+
+add_action( 'personal_options_update', 'ararat_save_profile_fields' );
+add_action( 'edit_user_profile_update', 'ararat_save_profile_fields' );
+ 
+function ararat_save_profile_fields( $user_id ) {
+	
+	if( ! isset( $_POST[ '_wpnonce' ] ) || ! wp_verify_nonce( $_POST[ '_wpnonce' ], 'update-user_' . $user_id ) ) {
+		return;
+	}
+	
+	if( ! current_user_can( 'edit_user', $user_id ) ) {
+		return;
+	}
+ 
+	update_user_meta( $user_id, 'contact_name', sanitize_text_field( $_POST[ 'contact_name' ] ) );
+	update_user_meta( $user_id, 'contact_email', sanitize_text_field( $_POST[ 'contact_email' ] ) );
+	update_user_meta( $user_id, 'contact_phone', sanitize_text_field( $_POST[ 'contact_phone' ] ) );
+	update_user_meta( $user_id, 'contact_country', sanitize_text_field( $_POST[ 'contact_country' ] ) );
+ 
+}
+
+add_action('graphql_register_types', function() {
+    register_graphql_field('User', 'contactInformation', [
+        'type' => 'ContactInformation',
+        'description' => 'Additional contact information for the user',
+        'resolve' => function($user) {
+            return [
+                'contactName' => get_user_meta($user->ID, 'contact_name', true),
+                'contactEmail' => get_user_meta($user->ID, 'contact_email', true),
+                'contactPhone' => get_user_meta($user->ID, 'contact_phone', true),
+                'contactCountry' => get_user_meta($user->ID, 'contact_country', true),
+            ];
+        }
+    ]);
+
+    register_graphql_object_type('ContactInformation', [
+        'description' => 'User contact information fields',
+        'fields' => [
+            'contactName' => [
+                'type' => 'String',
+                'description' => 'The contact name of the user'
+            ],
+            'contactEmail' => [
+                'type' => 'String',
+                'description' => 'The contact email of the user'
+            ],
+            'contactPhone' => [
+                'type' => 'String',
+                'description' => 'The contact phone number of the user'
+            ],
+            'contactCountry' => [
+                'type' => 'String',
+                'description' => 'The contact country of the user'
+            ]
+        ]
+    ]);
+});
+
+add_action('graphql_register_types', function() {
+    register_graphql_field('User', 'userData', [
+        'type' => 'UserData',
+        'description' => 'Additional user data fields',
+        'resolve' => function($user) {
+            $user_info = get_userdata($user->userId);
+            return [
+                'email' => $user_info->user_email,
+                'username' => $user_info->user_login,
+                'capabilities' => array_keys($user_info->allcaps),
+                'roles' => $user_info->roles,
+                'nickname' => $user_info->nickname,
+                'firstName' => $user_info->first_name,
+                'lastName' => $user_info->last_name,
+                'displayName' => $user_info->display_name,
+                'avatar' => get_avatar_url($user_info->ID)
+            ];
+        }
+    ]);
+
+    register_graphql_object_type('UserData', [
+        'description' => 'User data fields',
+        'fields' => [
+            'email' => [
+                'type' => 'String',
+                'description' => 'The user email'
+            ],
+            'username' => [
+                'type' => 'String',
+                'description' => 'The username'
+            ],
+            'capabilities' => [
+                'type' => ['list_of' => 'String'],
+                'description' => 'User capabilities'
+            ],
+            'roles' => [
+                'type' => ['list_of' => 'String'],
+                'description' => 'User roles'
+            ],
+            'nickname' => [
+                'type' => 'String',
+                'description' => 'User nickname'
+            ],
+            'firstName' => [
+                'type' => 'String',
+                'description' => 'User first name'
+            ],
+            'lastName' => [
+                'type' => 'String',
+                'description' => 'User last name'
+            ],
+            'displayName' => [
+                'type' => 'String',
+                'description' => 'User display name'
+            ],
+            'avatar' => [
+                'type' => 'String',
+                'description' => 'User avatar URL'
+            ]
+        ]
+    ]);
+});
+
 // ******** Account ******** //
 add_action( 'graphql_register_types', 'wpgraphql_account_register_types' );
 
@@ -337,7 +511,7 @@ function wpgraphql_account_register_types() {
 				'type' => 'String',
 				'description' => __( 'The Owner of the Account', 'global1sim' ),
 				'resolve' => function($source) {
-					return !empty($source->account_name) ? (string) $source->account_name : null;
+					return !empty($source->account_owner) ? (string) $source->account_owner : null;
 				}
 			],
 			'account_balance' => [
@@ -384,6 +558,45 @@ function wpgraphql_account_register_types() {
 	]);
 
 }
+
+register_graphql_field('RootQuery', 'accountByName', [
+    'type' => 'Account',
+    'description' => __('Get account by account name', 'global1sim'),
+    'args' => [
+        'account_name' => [
+            'type' => ['non_null' => 'String'],
+            'description' => __('The name of the account', 'global1sim')
+        ]
+    ],
+    'resolve' => function($root, $args) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'jet_cct_accounts';
+        $account_name = sanitize_text_field($args['account_name']);
+        
+		// $query = $wpdb->prepare("SELECT * FROM {$table_name} WHERE account_name IN ($account_name)", $keys);
+		// $result    = $wpdb->get_results($query);
+        $result = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$table_name} WHERE account_name = %s",
+                $account_name
+            ),
+            ARRAY_A
+        );
+		
+
+        if (!$result) {
+            return null;
+        }
+
+        $account = [];
+        foreach ($result as $key => $value) {
+			graphql_debug( "########## result $key value: " . $result );
+            $account[$key] = $value;
+        }
+        
+        return $account;
+    }
+]);
 
 // ******** ESIM ******** //
 add_action( 'graphql_register_types', 'wpgraphql_esim_register_types' );
@@ -893,6 +1106,7 @@ add_action( 'graphql_init', function() {
 		return $loaders;
 	}, 10, 2 );
 
+
 	add_filter( 'graphql_resolve_node_type', function( $type, $node ) {
 		return $node->__typename ?? $type;
 	}, 10, 2 );
@@ -1055,3 +1269,45 @@ add_action( 'graphql_init', function() {
 
 	}
 });
+
+
+// Add this to your functions.php file
+add_filter('graphql_RootQueryToUserConnectionWhereArgs_fields', function($fields) {
+    $fields['includeAllUsers'] = [
+        'type' => 'Boolean',
+        'description' => 'Include all users regardless of role',
+    ];
+    return $fields;
+});
+
+add_filter('graphql_User_connection_query_args', function($query_args, $connection_args) {
+    if (isset($connection_args['where']['includeAllUsers']) && $connection_args['where']['includeAllUsers'] === true) {
+        // Remove all role and capability restrictions
+        unset($query_args['role__in']);
+        unset($query_args['role__not_in']);
+        unset($query_args['role']);
+        unset($query_args['capability']);
+        unset($query_args['who']);
+        
+        // Set number of users to -1 to get all users
+        $query_args['number'] = -1;
+        
+        // Add filter to remove role restrictions from the main query
+        add_filter('users_pre_query', function($null, $query) {
+            if (!empty($query->query_vars['capability'])) {
+                unset($query->query_vars['role__in']);
+            }
+            if (!empty($query->query_vars['role__not_in'])) {
+                unset($query->query_vars['role__not_in']);
+            }
+            return $null;
+        }, 10, 2);
+
+        // Add filter to modify the WHERE clause
+        add_filter('users_list_table_query_args', function($args) {
+            unset($args['role']);
+            return $args;
+        });
+    }
+    return $query_args;
+}, 10, 2);
